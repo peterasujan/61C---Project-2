@@ -2,11 +2,11 @@
  *
  * CS61C Spring 2013 Project 2: Small World
  *
- * Partner 1 Name:
- * Partner 1 Login:
+ * Partner 1 Name: Alec Guertin
+ * Partner 1 Login: de
  *
- * Partner 2 Name:
- * Partner 2 Login:
+ * Partner 2 Name: Peter Sujan
+ * Partner 2 Login: cc
  *
  * REMINDERS: 
  *
@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -107,6 +108,60 @@ public class SmallWorld {
 
     }
 
+
+    /* Represents a path between two nodes, as a pair of numbers. */
+    public static class Pair implements WritableComparable {
+	private long start;
+	private long end;
+
+	public Pair(long s, long e) {
+	    start = s;
+	    end = e;
+	}
+
+	public void write(DataOutput out) throws IOException {
+	    out.writeLong(start);
+	    out.writeLong(end);
+	}
+
+	public void readFields(DataInput in) throws IOException {
+	    start = in.readLong();
+	    end = in.readLong();
+	}
+
+	public String toString() {
+	    return String.format("(%d, %d)", start, end);
+	}
+
+	public int hashCode() {
+	    final int prime = 31;
+	    int result = 1;
+	    result = prime * result + (int) start;
+	    result = prime * result + (int) (end ^ (end >>> 32));
+	    return result;
+	}
+
+	public long getStart() {
+	    return start;
+	}
+
+	public long getEnd() {
+	    return end;
+	}
+
+	@Override
+	public int compareTo(Object obj) {
+	    Pair o = (Pair) obj;
+	    if (start == o.getStart()) {
+		if (end == o.getEnd())
+		    return 0;
+		if (end < o.getEnd())
+		    return -1;
+		return 1;
+	    }
+	    return start < o.getStart() ? -1 : 1;
+	}
+    }
 
     /* The first mapper. Part of the graph loading process, currently just an 
      * identity function. Modify as you wish. */

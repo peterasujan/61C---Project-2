@@ -34,7 +34,7 @@ classes:
 	mkdir classes
 
 clean:
-	rm -rf classes $(TARGET) *-out
+	rm -rf classes $(TARGET) *-out *~
 
 runhadoop:
 	hadoop jar sw.jar SmallWorld ~cs61c/proj2data/ring4.seq output-out 1
