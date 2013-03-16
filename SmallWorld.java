@@ -117,6 +117,9 @@ public class SmallWorld {
         int visited;
 	ArrayList<LongWritable> neighbors;
 
+	public Vertex() {
+	}
+
 	public Vertex(int d, int v, ArrayList<LongWritable> n) {
 	    dist = d;
 	    visited = v;
@@ -145,6 +148,7 @@ public class SmallWorld {
 	    visited = in.readInt();
 	    int length = in.readInt();
 	    LongWritable x;
+	    neighbors = new ArrayList<LongWritable>();
 	    for (int i = 0; i < length; i++) {
 		x = new LongWritable();
 		x.readFields(in);
@@ -229,7 +233,7 @@ public class SmallWorld {
 
 	    if (value.visited == 0) {
 		for (int i = 0; i < value.neighbors.size(); i += 1) {
-		    context.write(value.neighbors.get(i), new Vertex(value.dist + 1, value.visited, null));
+		    context.write(value.neighbors.get(i), new Vertex(value.dist + 1, value.visited, new ArrayList<LongWritable>()));
 		}
 		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors));
 	    } else {
@@ -251,7 +255,7 @@ public class SmallWorld {
 	    
 	    int minDist = Integer.MAX_VALUE;
 	    int vis = -1;
-	    ArrayList<LongWritable> serbians = null;
+	    ArrayList<LongWritable> serbians = new ArrayList<LongWritable>();
 
             for (Vertex value : values){            
                 if (value.dist < minDist) {
@@ -260,7 +264,7 @@ public class SmallWorld {
 		if (value.visited > vis) {
 		    vis = value.visited;
 		}
-		if (value.neighbors != null) {
+		if (value.neighbors.size() > 0) {
 		    serbians = value.neighbors;
 		}
             }
@@ -271,15 +275,39 @@ public class SmallWorld {
 
 
 
+    /* The Histogram mapper. */
+    public static class HistoMap extends Mapper<LongWritable, Vertex, LongWritable, LongWritable> {
+
+        @Override
+        public void map(LongWritable key, Vertex value, Context context)
+                throws IOException, InterruptedException {
+
+            int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
+	    LongWritable one = new LongWritable((long) 1);
+            context.write(new LongWritable((long) value.dist), one);
+        }
+    }
 
 
+    /* The Histogram reducer. */
+    public static class HistoReduce extends Reducer<LongWritable, LongWritable, 
+        LongWritable, LongWritable> {
 
+        public long denom;
 
+        public void reduce(LongWritable key, Iterable<LongWritable> values, 
+            Context context) throws IOException, InterruptedException {
+           
+	    long total = 0;
 
+	    for (LongWritable value : values){            
+                total += value.get();
+            }
 
+	    context.write(key, new LongWritable(total));
+        }
 
-
-
+    }
 
 
     public static void main(String[] rawArgs) throws Exception {
@@ -330,10 +358,8 @@ public class SmallWorld {
             job.setOutputKeyClass(LongWritable.class);
             job.setOutputValueClass(Vertex.class);
 
-            // You'll want to modify the following based on what you call
-            // your mapper and reducer classes for the BFS phase.
-            job.setMapperClass(Mapper.class); // currently the default Mapper
-            job.setReducerClass(Reducer.class); // currently the default Reducer
+            job.setMapperClass(BFSMap.class);
+            job.setReducerClass(BFSReduce.class);
 
             job.setInputFormatClass(SequenceFileInputFormat.class);
             job.setOutputFormatClass(SequenceFileOutputFormat.class);
@@ -360,8 +386,8 @@ public class SmallWorld {
 
         // You'll want to modify the following based on what you call your
         // mapper and reducer classes for the Histogram Phase
-        job.setMapperClass(Mapper.class); // currently the default Mapper
-        job.setReducerClass(Reducer.class); // currently the default Reducer
+        job.setMapperClass(HistoMap.class);
+        job.setReducerClass(HistoReduce.class);
 
         job.setInputFormatClass(SequenceFileInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);
