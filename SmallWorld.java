@@ -109,57 +109,55 @@ public class SmallWorld {
     }
 
 
-    /* Represents a path between two nodes, as a pair of numbers. */
-    public static class Pair implements WritableComparable {
-	private long start;
-	private long end;
+    /* Represents a node, as well as its neighbors and whether it
+     * has been visited.
+     */
+    public static class Vertex implements Writable {
+	int dist;
+        int visited;
+	ArrayList<LongWritable> neighbors;
 
-	public Pair(long s, long e) {
-	    start = s;
-	    end = e;
+	public Vertex(int d, int v, ArrayList<LongWritable> n) {
+	    dist = d;
+	    visited = v;
+	    neighbors = new ArrayList<LongWritable>(n);
 	}
 
 	public void write(DataOutput out) throws IOException {
-	    out.writeLong(start);
-	    out.writeLong(end);
+	    out.writeInt(dist);
+	    out.writeInt(visited);
+
+	    int length = 0;
+	    if (neighbors != null){
+                length = neighbors.size();
+            }
+
+            out.writeInt(length);
+
+            // now write each long in the array
+            for (int i = 0; i < length; i++){
+		neighbors.get(i).write(out);
+            }
 	}
 
 	public void readFields(DataInput in) throws IOException {
-	    start = in.readLong();
-	    end = in.readLong();
+	    dist = in.readInt();
+	    visited = in.readInt();
+	    int length = in.readInt();
+	    LongWritable x;
+	    for (int i = 0; i < length; i++) {
+		x = new LongWritable();
+		x.readFields(in);
+		neighbors.add(x);
+	    }
 	}
 
 	public String toString() {
-	    return String.format("(%d, %d)", start, end);
-	}
-
-	public int hashCode() {
-	    final int prime = 31;
-	    int result = 1;
-	    result = prime * result + (int) start;
-	    result = prime * result + (int) (end ^ (end >>> 32));
-	    return result;
-	}
-
-	public long getStart() {
-	    return start;
-	}
-
-	public long getEnd() {
-	    return end;
-	}
-
-	@Override
-	public int compareTo(Object obj) {
-	    Pair o = (Pair) obj;
-	    if (start == o.getStart()) {
-		if (end == o.getEnd())
-		    return 0;
-		if (end < o.getEnd())
-		    return -1;
-		return 1;
+	    String output = "" + visited + " ; " + dist;
+	    for (int i = 0; i < neighbors.size(); i++) {
+		output += "" + neighbors.get(i) + " ";
 	    }
-	    return start < o.getStart() ? -1 : 1;
+	    return output;
 	}
     }
 
@@ -187,7 +185,7 @@ public class SmallWorld {
      * and using the denom field.  
      */
     public static class LoaderReduce extends Reducer<LongWritable, LongWritable, 
-        LongWritable, LongWritable> {
+        LongWritable, Vertex> {
 
         public long denom;
 
@@ -198,11 +196,19 @@ public class SmallWorld {
 
             // You can print it out by uncommenting the following line:
             // System.out.println(denom);
-
+	    ArrayList<LongWritable> armenians = new ArrayList<LongWritable>();
             // Example of iterating through an Iterable
             for (LongWritable value : values){            
-                context.write(key, value);
+                armenians.add(value);
             }
+	    int distance = Integer.MAX_VALUE;
+	    int visisted = -1;
+	    double chance = (new Random()).nextDouble();
+	    if (chance <= (1.0 / denom)) {
+		distance = 0;
+		visisted = 0;
+	    }
+	    context.write(key, new Vertex(distance, visisted, armenians));
         }
 
     }
@@ -211,6 +217,57 @@ public class SmallWorld {
     // ------- Add your additional Mappers and Reducers Here ------- //
 
 
+    /* The BFS mapper.*/
+    public static class BFSMap extends Mapper<LongWritable, Vertex, 
+        LongWritable, Vertex> {
+
+        @Override
+        public void map(LongWritable key, Vertex value, Context context)
+                throws IOException, InterruptedException {
+
+            int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
+
+	    if (value.visited == 0) {
+		for (int i = 0; i < value.neighbors.size(); i += 1) {
+		    context.write(value.neighbors.get(i), new Vertex(value.dist + 1, value.visited, null));
+		}
+		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors));
+	    } else {
+		context.write(key, value);
+        
+	    }
+	}
+    }
+
+
+    /* The BFS reducer. */
+    public static class BFSReduce extends Reducer<LongWritable, Vertex, 
+        LongWritable, Vertex> {
+
+        public long denom;
+
+        public void reduce(LongWritable key, Iterable<Vertex> values, 
+            Context context) throws IOException, InterruptedException {
+	    
+	    int minDist = Integer.MAX_VALUE;
+	    int vis = -1;
+	    ArrayList<LongWritable> serbians = null;
+
+            for (Vertex value : values){            
+                if (value.dist < minDist) {
+		    minDist = value.dist;
+		}
+		if (value.visited > vis) {
+		    vis = value.visited;
+		}
+		if (value.neighbors != null) {
+		    serbians = value.neighbors;
+		}
+            }
+	    context.write(key, new Vertex(minDist, vis, serbians));
+	}
+
+    }
 
 
 
@@ -246,7 +303,7 @@ public class SmallWorld {
         job.setMapOutputKeyClass(LongWritable.class);
         job.setMapOutputValueClass(LongWritable.class);
         job.setOutputKeyClass(LongWritable.class);
-        job.setOutputValueClass(LongWritable.class);
+        job.setOutputValueClass(Vertex.class);
 
         job.setMapperClass(LoaderMap.class);
         job.setReducerClass(LoaderReduce.class);
@@ -269,9 +326,9 @@ public class SmallWorld {
 
             // Feel free to modify these four lines as necessary:
             job.setMapOutputKeyClass(LongWritable.class);
-            job.setMapOutputValueClass(LongWritable.class);
+            job.setMapOutputValueClass(Vertex.class);
             job.setOutputKeyClass(LongWritable.class);
-            job.setOutputValueClass(LongWritable.class);
+            job.setOutputValueClass(Vertex.class);
 
             // You'll want to modify the following based on what you call
             // your mapper and reducer classes for the BFS phase.
