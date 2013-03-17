@@ -116,14 +116,16 @@ public class SmallWorld {
 	int dist;
         int visited;
 	ArrayList<LongWritable> neighbors;
+	LongWritable origin;
 
 	public Vertex() {
 	}
 
-	public Vertex(int d, int v, ArrayList<LongWritable> n) {
+	public Vertex(int d, int v, ArrayList<LongWritable> n, LongWritable orig) {
 	    dist = d;
 	    visited = v;
 	    neighbors = new ArrayList<LongWritable>(n);
+	    origin = orig;
 	}
 
 	public void write(DataOutput out) throws IOException {
@@ -138,29 +140,30 @@ public class SmallWorld {
             out.writeInt(length);
 
             // now write each long in the array
-            for (int i = 0; i < length; i++){
-		neighbors.get(i).write(out);
+            for (int i = 0; i < length; i += 1){
+		out.writeLong(neighbors.get(i).get());
             }
+	    out.writeLong(origin.get());
 	}
 
 	public void readFields(DataInput in) throws IOException {
 	    dist = in.readInt();
 	    visited = in.readInt();
 	    int length = in.readInt();
-	    LongWritable x;
 	    neighbors = new ArrayList<LongWritable>();
 	    for (int i = 0; i < length; i++) {
-		x = new LongWritable();
-		x.readFields(in);
-		neighbors.add(x);
+		neighbors.add(new LongWritable(in.readLong()));
 	    }
+	    origin = new LongWritable(in.readLong());
 	}
 
 	public String toString() {
-	    String output = "" + visited + " ; " + dist;
+	    String output = "(";
 	    for (int i = 0; i < neighbors.size(); i++) {
 		output += "" + neighbors.get(i) + " ";
 	    }
+	    output += ")";
+	    output += " | " + dist + " | " + visited + " | " + origin;
 	    return output;
 	}
     }
@@ -173,12 +176,10 @@ public class SmallWorld {
         @Override
         public void map(LongWritable key, LongWritable value, Context context)
                 throws IOException, InterruptedException {
-
+	    //System.err.println("Input: " +key + "   " + value);//
             // example of getting value passed from main
             int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
-
-
-            context.write(key, value);
+            context.write(key, value); //
         }
     }
 
@@ -195,14 +196,16 @@ public class SmallWorld {
 
         public void reduce(LongWritable key, Iterable<LongWritable> values, 
             Context context) throws IOException, InterruptedException {
-            // We can grab the denom field from context: 
+
             denom = Long.parseLong(context.getConfiguration().get("denom"));
 
+	    System.err.println("Loader Reducer : " + key);//
+
             // You can print it out by uncommenting the following line:
-            // System.out.println(denom);
+            //System.out.println(denom);
 	    ArrayList<LongWritable> armenians = new ArrayList<LongWritable>();
-            // Example of iterating through an Iterable
-            for (LongWritable value : values){            
+            for (LongWritable value : values){
+		System.err.println("" + key + ": " + value);//
                 armenians.add(value);
             }
 	    int distance = Integer.MAX_VALUE;
@@ -212,14 +215,12 @@ public class SmallWorld {
 		distance = 0;
 		visisted = 0;
 	    }
-	    context.write(key, new Vertex(distance, visisted, armenians));
+	    System.err.println(key + " " + (new Vertex(distance, visisted, armenians, key)).toString());//
+	    context.write(key, new Vertex(distance, visisted, armenians, key));
         }
-
     }
 
-
     // ------- Add your additional Mappers and Reducers Here ------- //
-
 
     /* The BFS mapper.*/
     public static class BFSMap extends Mapper<LongWritable, Vertex, 
@@ -231,14 +232,20 @@ public class SmallWorld {
 
             int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
 
+	    System.err.println("Map : " + key);//
+
 	    if (value.visited == 0) {
 		for (int i = 0; i < value.neighbors.size(); i += 1) {
-		    context.write(value.neighbors.get(i), new Vertex(value.dist + 1, value.visited, new ArrayList<LongWritable>()));
+		    Vertex distPlus = new Vertex(value.dist + 1, value.visited, new ArrayList<LongWritable>(), value.origin);
+		    System.err.println(key + " " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
+		    context.write(value.neighbors.get(i), distPlus);
 		}
-		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors));
+		Vertex visPlus = new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin);
+		System.err.println(key + value.toString() + " > " + key + " " + visPlus.toString());//
+		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin));
 	    } else {
-		context.write(key, value);
-        
+		System.err.println(key + value.toString() + " > " + key + " " + value.toString());//
+		context.write(key, new Vertex(value.dist, value.visited, value.neighbors, value.origin));
 	    }
 	}
     }
@@ -254,21 +261,32 @@ public class SmallWorld {
             Context context) throws IOException, InterruptedException {
 	    
 	    int minDist = Integer.MAX_VALUE;
-	    int vis = -1;
 	    ArrayList<LongWritable> serbians = new ArrayList<LongWritable>();
 
-            for (Vertex value : values){            
-                if (value.dist < minDist) {
-		    minDist = value.dist;
+	    HashMap<LongWritable, Integer> minDistances = new HashMap<LongWritable, Integer>();
+	    System.err.println("Reduce : " + key);//
+            for (Vertex value : values){
+		if (value.visited == 0 && key.get() == value.origin.get() && value.dist != 0) {
+		    continue;
 		}
-		if (value.visited > vis) {
-		    vis = value.visited;
-		}
+		if (value.visited != 0) {
+		    Vertex copy = new Vertex(value.dist, value.visited, value.neighbors, value.origin);
+		    System.err.println(key + " " + copy.toString());//
+		    context.write(key, copy);
+		} else if (!minDistances.containsKey(value.origin) || (minDistances.get(value.origin) > value.dist)) {
+		    minDistances.put(value.origin, value.dist);
+		}	
 		if (value.neighbors.size() > 0) {
 		    serbians = value.neighbors;
 		}
             }
-	    context.write(key, new Vertex(minDist, vis, serbians));
+	    Iterator<LongWritable> keys = minDistances.keySet().iterator();
+	    while (keys.hasNext()) { 
+		LongWritable org = keys.next();
+		Vertex temp = new Vertex(minDistances.get(org), 0, serbians, org);
+		System.err.println(key + " " + temp.toString());//
+		context.write(key, temp);
+	    }
 	}
 
     }
@@ -282,10 +300,11 @@ public class SmallWorld {
         public void map(LongWritable key, Vertex value, Context context)
                 throws IOException, InterruptedException {
 
-            int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
-	    LongWritable one = new LongWritable((long) 1);
-            context.write(new LongWritable((long) value.dist), one);
-        }
+            LongWritable one = new LongWritable((long) 1);
+	    if (value.visited == 1) {
+		context.write(new LongWritable((long) value.dist), one);
+	    }
+	}
     }
 
 
