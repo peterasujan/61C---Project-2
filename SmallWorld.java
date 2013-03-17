@@ -119,13 +119,12 @@ public class SmallWorld {
 	LongWritable origin;
 
 	public Vertex() {
-	    neighbors = new ArrayList<LongWritable>();
 	}
 
 	public Vertex(int d, int v, ArrayList<LongWritable> n, LongWritable orig) {
 	    dist = d;
 	    visited = v;
-	    neighbors = new ArrayList<LongWritable>(n);
+	    neighbors = n;
 	    origin = orig;
 	}
 
@@ -152,9 +151,10 @@ public class SmallWorld {
 	    visited = in.readInt();
 	    int length = in.readInt();
 	    LongWritable x = new LongWritable();
+	    neighbors = new ArrayList<LongWritable>();
 	    for (int i = 0; i < length; i++) {
 		x.readFields(in);
-		neighbors.add(i, new LongWritable(x.get()));
+		neighbors.add(new LongWritable(x.get()));
 	    }
 	    origin = new LongWritable(in.readLong());
 	}
@@ -200,7 +200,7 @@ public class SmallWorld {
             Context context) throws IOException, InterruptedException {
 
 
-	    //System.err.println("Loader Reducer : " + key);//
+	    System.err.println("Loader Reducer : " + key);//
 
             // You can print it out by uncommenting the following line:
             //System.out.println(denom);
@@ -222,7 +222,7 @@ public class SmallWorld {
 		distance = 0;
 		visisted = 0;
 	    }
-	    //System.err.println(key + " " + (new Vertex(distance, visisted, armenians, key)).toString());//
+	    System.err.println(key + " " + (new Vertex(distance, visisted, armenians, key)).toString());//
 	    context.write(key, new Vertex(distance, visisted, armenians, key));
         }
     }
@@ -239,20 +239,20 @@ public class SmallWorld {
 
             int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
 
-	    //System.err.println("Map : " + key);//
+	    System.err.println("Map : " + key);//
 
 	    if (value.visited == 0) {
 		for (int i = 0; i < value.neighbors.size(); i += 1) {
 		    Vertex distPlus = new Vertex(value.dist + 1, value.visited, new ArrayList<LongWritable>(), value.origin);
-		    //System.err.println(key + " " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
+		    System.err.println(key + " " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
 		    context.write(value.neighbors.get(i), distPlus);
 		}
 		Vertex visPlus = new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin);
-		//System.err.println(key + value.toString() + " > " + key + " " + visPlus.toString());//
+		System.err.println(key + value.toString() + " > " + key + " " + visPlus.toString());//
 		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin));
 	    } else {
-		//System.err.println(key + value.toString() + " > " + key + " " + value.toString());//
-		context.write(key, new Vertex(value.dist, value.visited, value.neighbors, value.origin));
+		System.err.println(key + value.toString() + " > " + key + " " + value.toString());//
+		context.write(key, value);
 	    }
 	}
     }
@@ -268,18 +268,17 @@ public class SmallWorld {
             Context context) throws IOException, InterruptedException {
 	    
 	    int minDist = Integer.MAX_VALUE;
-	    ArrayList<LongWritable> serbians = new ArrayList<LongWritable>();
+	    ArrayList<LongWritable> serbians = null;
 
 	    HashMap<LongWritable, Integer> minDistances = new HashMap<LongWritable, Integer>();
-	    //System.err.println("Reduce : " + key);//
+	    System.err.println("Reduce : " + key);//
             for (Vertex value : values){
 		if (value.visited == 0 && key.get() == value.origin.get() && value.dist != 0) {
 		    continue;
 		}
-		if (value.visited != 0) {
-		    Vertex copy = new Vertex(value.dist, value.visited, value.neighbors, value.origin);
-		    //System.err.println(key + " " + copy.toString());//
-		    context.write(key, copy);
+		if (value.visited != 0) {;
+		    System.err.println(key + " " + value.toString());//
+		    context.write(key, value);
 		} else if (!minDistances.containsKey(value.origin) || (minDistances.get(value.origin) > value.dist)) {
 		    minDistances.put(value.origin, value.dist);
 		}	
@@ -291,23 +290,22 @@ public class SmallWorld {
 	    while (keys.hasNext()) { 
 		LongWritable org = keys.next();
 		Vertex temp = new Vertex(minDistances.get(org), 0, serbians, org);
-		//System.err.println(key + " " + temp.toString());//
+		System.err.println(key + " " + temp.toString());//
 		context.write(key, temp);
 	    }
 	}
 
     }
 
-
-
     /* The Histogram mapper. */
     public static class HistoMap extends Mapper<LongWritable, Vertex, LongWritable, LongWritable> {
+
+	static LongWritable one = new LongWritable(1);
 
         @Override
         public void map(LongWritable key, Vertex value, Context context)
                 throws IOException, InterruptedException {
 
-            LongWritable one = new LongWritable((long) 1);
 	    if (value.visited == 1) {
 		context.write(new LongWritable((long) value.dist), one);
 	    }
@@ -329,7 +327,7 @@ public class SmallWorld {
 	    for (LongWritable value : values){            
                 total += value.get();
             }
-	    System.err.println("" + key + " " + total);//
+	    //System.err.println("" + key + " " + total);//
 	    context.write(key, new LongWritable(total));
         }
 
