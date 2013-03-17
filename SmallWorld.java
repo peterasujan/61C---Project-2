@@ -129,7 +129,7 @@ public class SmallWorld {
 	}
 
 	public void write(DataOutput out) throws IOException {
-	    /*
+	    
 	    out.writeInt(dist);
 	    out.writeInt(visited);
 
@@ -145,14 +145,14 @@ public class SmallWorld {
 		out.writeLong(neighbors.get(i).get());
             }
 	    out.writeLong(origin.get());
-	    */
+	    /*
 	    Text temp = new Text(toString());
 	    temp.write(out);
-	
+	    */
 	}
 
 	public void readFields(DataInput in) throws IOException {
-	    /*
+	    
 	    dist = in.readInt();
 	    visited = in.readInt();
 	    int length = in.readInt();
@@ -163,7 +163,7 @@ public class SmallWorld {
 		neighbors.add(new LongWritable(x.get()));
 	    }
 	    origin = new LongWritable(in.readLong());
-	    */
+	    /*
 	    Text temp = new Text();
 	    temp.readFields(in);
 	    String temp2 = temp.toString();
@@ -187,7 +187,7 @@ public class SmallWorld {
 	    dist = Integer.parseInt(tokens[1].replace(" ", ""));
 	    visited = Integer.parseInt(tokens[2].replace(" ", ""));
 	    origin = new LongWritable(Long.parseLong(tokens[3].replace(" ", "")));
-	    
+	    */
 	}
 
 	public String toString() {
@@ -198,6 +198,59 @@ public class SmallWorld {
 	    output += " ; " + dist + " ; " + visited + " ; " + origin;
 	    return output;
 	}
+    }
+
+    public static class VertexCompiler implements Writable {
+
+	ArrayList<LongWritable> near;
+
+	ArrayList<Vertex> vertices = new ArrayList<Vertex>();
+
+	public VertexCompiler() {
+	}
+
+	public void add(Vertex v) {
+	    vertices.add(v);
+	}
+
+	public Vertex get(int i) {
+	    return vertices.get(i);
+	}
+
+	public void write(DataOutput out) throws IOException {
+
+	    out.writeInt(near.size());
+
+	    for (int i = 0; i < near.size(); i += 1) {
+		out.writeLong(near.get(i).get());
+	    }
+
+	    out.writeInt(vertices.size());
+
+	    for (int j = 0; j < vertices.size(); j += 1) {
+		vertices.get(j).write(out);
+	    }
+	
+	}
+
+	public void readFields(DataInput in) throws IOException {
+	    
+	    int nearLength = in.readInt();
+
+	    for (int i = 0; i < nearLength; i += 1) {
+		near.add(new LongWritable(in.readLong()));
+	    }
+
+	    int vertSize = in.readInt();
+
+	    for (int j = 0; j < vertSize; j += 1) {
+		Vertex temp = new Vertex();
+		temp.readFields(in);
+		vertices.add(temp);
+	    }
+
+	}
+
     }
 
     /* The first mapper. Part of the graph loading process, currently just an 
@@ -276,11 +329,11 @@ public class SmallWorld {
 	    if (value.visited == 0) {
 		for (int i = 0; i < value.neighbors.size(); i += 1) {
 		    Vertex distPlus = new Vertex(value.dist + 1, value.visited, new ArrayList<LongWritable>(), value.origin);
-		    //System.out.println(key + " " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
+		    System.out.println(key + ": " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
 		    context.write(value.neighbors.get(i), distPlus);
 		}
 		Vertex visPlus = new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin);
-		//System.out.println(key + value.toString() + " > " + key + " " + visPlus.toString());//
+		System.out.println(key + ": " +  value.toString() + " > " + key + ": " + visPlus.toString());//
 		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin));
 	    } else {
 		//System.out.println(key + value.toString() + " > " + key + " " + value.toString());//
