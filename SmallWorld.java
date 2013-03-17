@@ -119,6 +119,7 @@ public class SmallWorld {
 	LongWritable origin;
 
 	public Vertex() {
+	    neighbors = new ArrayList<LongWritable>();
 	}
 
 	public Vertex(int d, int v, ArrayList<LongWritable> n, LongWritable orig) {
@@ -150,11 +151,10 @@ public class SmallWorld {
 	    dist = in.readInt();
 	    visited = in.readInt();
 	    int length = in.readInt();
-	    neighbors = new ArrayList<LongWritable>();
 	    LongWritable x = new LongWritable();
 	    for (int i = 0; i < length; i++) {
 		x.readFields(in);
-		neighbors.add(new LongWritable(x.get()));
+		neighbors.add(i, new LongWritable(x.get()));
 	    }
 	    origin = new LongWritable(in.readLong());
 	}
