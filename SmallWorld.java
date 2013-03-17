@@ -129,6 +129,7 @@ public class SmallWorld {
 	}
 
 	public void write(DataOutput out) throws IOException {
+	    /*
 	    out.writeInt(dist);
 	    out.writeInt(visited);
 
@@ -144,9 +145,14 @@ public class SmallWorld {
 		out.writeLong(neighbors.get(i).get());
             }
 	    out.writeLong(origin.get());
+	    */
+	    Text temp = new Text(toString());
+	    temp.write(out);
+	
 	}
 
 	public void readFields(DataInput in) throws IOException {
+	    /*
 	    dist = in.readInt();
 	    visited = in.readInt();
 	    int length = in.readInt();
@@ -157,15 +163,39 @@ public class SmallWorld {
 		neighbors.add(new LongWritable(x.get()));
 	    }
 	    origin = new LongWritable(in.readLong());
+	    */
+	    Text temp = new Text();
+	    temp.readFields(in);
+	    String temp2 = temp.toString();
+	    String[] tokens = temp2.split(" ; ");
+	    for (int k = 0; k < tokens.length; k += 1) {
+		//System.out.println(tokens[k]);//
+	    }
+	    String[] nebs = tokens[0].split(" ");
+	    neighbors = new ArrayList<LongWritable>();
+	    for (int j = 0; j < tokens.length; j += 1) {
+		//System.out.print(tokens[j] + " ");//
+	    }
+	    for (int i = 0; i < nebs.length; i += 1) {
+		//System.out.print(nebs[i]);//
+		if (!nebs[i].equals("")) {
+		    neighbors.add(new LongWritable(Long.parseLong(nebs[i].replace(" ", ""))));
+		}
+	    }
+	    //System.out.println();//
+	    //System.out.println(tokens[1] + " " + tokens[2] + " " + tokens[3]);//
+	    dist = Integer.parseInt(tokens[1].replace(" ", ""));
+	    visited = Integer.parseInt(tokens[2].replace(" ", ""));
+	    origin = new LongWritable(Long.parseLong(tokens[3].replace(" ", "")));
+	    
 	}
 
 	public String toString() {
-	    String output = "(";
+	    String output = "";
 	    for (int i = 0; i < neighbors.size(); i++) {
-		output += "" + neighbors.get(i) + " ";
+		output += " " + neighbors.get(i);
 	    }
-	    output += ")";
-	    output += " | " + dist + " | " + visited + " | " + origin;
+	    output += " ; " + dist + " ; " + visited + " ; " + origin;
 	    return output;
 	}
     }
@@ -199,8 +229,9 @@ public class SmallWorld {
         public void reduce(LongWritable key, Iterable<LongWritable> values, 
             Context context) throws IOException, InterruptedException {
 
+	    int denom = Integer.parseInt(context.getConfiguration().get("denom"));
 
-	    System.err.println("Loader Reducer : " + key);//
+	    //System.out.println("Loader Reducer : " + key);//
 
             // You can print it out by uncommenting the following line:
             //System.out.println(denom);
@@ -221,8 +252,9 @@ public class SmallWorld {
 	    if (chance <= (1.0 / denom)) {
 		distance = 0;
 		visisted = 0;
+		System.out.println("denom: " + denom + ", chosen: " + chance + "   1/denom: " + 1.0/denom);//
 	    }
-	    System.err.println(key + " " + (new Vertex(distance, visisted, armenians, key)).toString());//
+	    //System.out.println(key + " " + (new Vertex(distance, visisted, armenians, key)).toString());//
 	    context.write(key, new Vertex(distance, visisted, armenians, key));
         }
     }
@@ -239,19 +271,19 @@ public class SmallWorld {
 
             int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
 
-	    System.err.println("Map : " + key);//
+	    //System.out.println("Map : " + key);//
 
 	    if (value.visited == 0) {
 		for (int i = 0; i < value.neighbors.size(); i += 1) {
 		    Vertex distPlus = new Vertex(value.dist + 1, value.visited, new ArrayList<LongWritable>(), value.origin);
-		    System.err.println(key + " " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
+		    //System.out.println(key + " " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
 		    context.write(value.neighbors.get(i), distPlus);
 		}
 		Vertex visPlus = new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin);
-		System.err.println(key + value.toString() + " > " + key + " " + visPlus.toString());//
+		//System.out.println(key + value.toString() + " > " + key + " " + visPlus.toString());//
 		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin));
 	    } else {
-		System.err.println(key + value.toString() + " > " + key + " " + value.toString());//
+		//System.out.println(key + value.toString() + " > " + key + " " + value.toString());//
 		context.write(key, value);
 	    }
 	}
@@ -271,13 +303,13 @@ public class SmallWorld {
 	    ArrayList<LongWritable> serbians = null;
 
 	    HashMap<LongWritable, Integer> minDistances = new HashMap<LongWritable, Integer>();
-	    System.err.println("Reduce : " + key);//
+	    //System.out.println("Reduce : " + key);//
             for (Vertex value : values){
 		if (value.visited == 0 && key.get() == value.origin.get() && value.dist != 0) {
 		    continue;
 		}
 		if (value.visited != 0) {;
-		    System.err.println(key + " " + value.toString());//
+		    //System.out.println(key + " " + value.toString());//
 		    context.write(key, value);
 		} else if (!minDistances.containsKey(value.origin) || (minDistances.get(value.origin) > value.dist)) {
 		    minDistances.put(value.origin, value.dist);
@@ -290,7 +322,7 @@ public class SmallWorld {
 	    while (keys.hasNext()) { 
 		LongWritable org = keys.next();
 		Vertex temp = new Vertex(minDistances.get(org), 0, serbians, org);
-		System.err.println(key + " " + temp.toString());//
+		//System.out.println(key + " " + temp.toString());//
 		context.write(key, temp);
 	    }
 	}
