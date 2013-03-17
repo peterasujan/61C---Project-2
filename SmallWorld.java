@@ -264,7 +264,7 @@ public class SmallWorld {
 	    //System.err.println("Input: " +key + "   " + value);//
             // example of getting value passed from main
             int inputValue = Integer.parseInt(context.getConfiguration().get("inputValue"));
-            context.write(key, value); //
+            context.write(key, value);
         }
     }
 
@@ -305,7 +305,7 @@ public class SmallWorld {
 	    if (chance <= (1.0 / denom)) {
 		distance = 0;
 		visisted = 0;
-		System.out.println("denom: " + denom + ", chosen: " + chance + "   1/denom: " + 1.0/denom);//
+		//System.out.println("denom: " + denom + ", chosen: " + chance + "   1/denom: " + 1.0/denom);//
 	    }
 	    //System.out.println(key + " " + (new Vertex(distance, visisted, armenians, key)).toString());//
 	    context.write(key, new Vertex(distance, visisted, armenians, key));
@@ -329,11 +329,11 @@ public class SmallWorld {
 	    if (value.visited == 0) {
 		for (int i = 0; i < value.neighbors.size(); i += 1) {
 		    Vertex distPlus = new Vertex(value.dist + 1, value.visited, new ArrayList<LongWritable>(), value.origin);
-		    System.out.println(key + ": " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
+		    //System.out.println(key + ": " + value.toString() + " > " + value.neighbors.get(i) + " " + distPlus.toString());//
 		    context.write(value.neighbors.get(i), distPlus);
 		}
 		Vertex visPlus = new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin);
-		System.out.println(key + ": " +  value.toString() + " > " + key + ": " + visPlus.toString());//
+		//System.out.println(key + ": " +  value.toString() + " > " + key + ": " + visPlus.toString());//
 		context.write(key, new Vertex(value.dist, value.visited + 1, value.neighbors, value.origin));
 	    } else {
 		//System.out.println(key + value.toString() + " > " + key + " " + value.toString());//
@@ -354,8 +354,8 @@ public class SmallWorld {
 	    
 	    int minDist = Integer.MAX_VALUE;
 	    ArrayList<LongWritable> serbians = null;
-
-	    HashMap<LongWritable, Integer> minDistances = new HashMap<LongWritable, Integer>();
+	    HashSet<Long> blackSet = new HashSet<Long>();
+	    HashMap<Long, Integer> minDistances = new HashMap<Long, Integer>();
 	    //System.out.println("Reduce : " + key);//
             for (Vertex value : values){
 		if (value.visited == 0 && key.get() == value.origin.get() && value.dist != 0) {
@@ -363,18 +363,25 @@ public class SmallWorld {
 		}
 		if (value.visited != 0) {;
 		    //System.out.println(key + " " + value.toString());//
+		    blackSet.add(value.origin.get());
+		    if (minDistances.containsKey(value.origin.get())) {
+			minDistances.remove(value.origin.get());
+		    }
 		    context.write(key, value);
-		} else if (!minDistances.containsKey(value.origin) || (minDistances.get(value.origin) > value.dist)) {
-		    minDistances.put(value.origin, value.dist);
+		}
+		if (!blackSet.contains(value.origin.get()) && (!minDistances.containsKey(value.origin.get()) || (minDistances.get(value.origin.get()) > value.dist))) {
+		    //System.out.println(value.origin.get() + " : " + blackSet.contains(value.origin.get()));//
+		    minDistances.put(value.origin.get(), value.dist);
 		}	
 		if (value.neighbors.size() > 0) {
 		    serbians = value.neighbors;
 		}
             }
-	    Iterator<LongWritable> keys = minDistances.keySet().iterator();
+	    Iterator<Long> keys = minDistances.keySet().iterator();
 	    while (keys.hasNext()) { 
-		LongWritable org = keys.next();
-		Vertex temp = new Vertex(minDistances.get(org), 0, serbians, org);
+		Long org = keys.next();
+		//System.out.println(org + ": " + minDistances.get(org));//
+		Vertex temp = new Vertex(minDistances.get(org), 0, serbians, new LongWritable(org));
 		//System.out.println(key + " " + temp.toString());//
 		context.write(key, temp);
 	    }
